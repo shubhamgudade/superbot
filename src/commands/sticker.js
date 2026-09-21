@@ -36,7 +36,7 @@ function getMessageContent(message) {
 function getMediaType(content) {
   if (!content) return null;
 
-  if (content.imageMessage) return "image";
+  if (content.imageMessage) {\n    return content.imageMessage.mimetype?.toLowerCase() === "image/gif"\n      ? "gif"\n      : "image";\n  }
   if (content.videoMessage) return "video";
 
   if (
