@@ -154,11 +154,33 @@ async function animatedToSticker(input, output) {
 export default {
   name: "sticker",
   aliases: ["s", "st"],
-  async execute({ sock, message }) {
+  async execute({ sock, message, args, prefix }) {
     const logPrefix = "[Sticker]";
     console.log(`${logPrefix} Command received`);
 
-    const media = await getMedia(message);
+    let media = await getMedia(message);
+
+    // When the command is sent as a caption on the media itself,
+    // Baileys keeps the media and caption in the same message.
+    if (!media) {
+      const content = getMessageContent(message);
+      const caption =
+        content?.imageMessage?.caption ||
+        content?.videoMessage?.caption ||
+        content?.documentMessage?.caption ||
+        "";
+
+      const normalizedCaption = caption.trim();
+      const commandText = `${prefix || ""}${args?.length ? args.join(" ") : "s"}`.trim();
+
+      if (normalizedCaption === commandText || normalizedCaption === `${prefix || ""}sticker`) {
+        const type = getMediaType(content);
+        if (type) {
+          media = { message, type };
+          console.log(`${logPrefix} Media command found in caption: ${normalizedCaption}`);
+        }
+      }
+    }
 
     if (!media) {
       console.log(`${logPrefix} No supported media found`);
