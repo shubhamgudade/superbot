@@ -1,21 +1,49 @@
 import "dotenv/config";
+import fs from "node:fs/promises";
+import path from "node:path";
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 
-const PREFIX = "+";
+const DEFAULT_PREFIX = "+";
+const CONFIG_DIR = "data";
+const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+
 const phoneNumber = (process.env.PHONE_NUMBER || "").replace(/\D/g, "");
 
 if (!phoneNumber) {
   throw new Error("PHONE_NUMBER is required in .env");
 }
 
-let pairingCodeRequested = false;
+async function getPrefix() {
+  try {
+    const raw = await fs.readFile(CONFIG_FILE, "utf8");
+    const config = JSON.parse(raw);
+
+    if (typeof config.prefix === "string" && config.prefix.length > 0) {
+      return config.prefix;
+    }
+  } catch {
+    // Use the default when the config file does not exist or is invalid.
+  }
+
+  return DEFAULT_PREFIX;
+}
+
+async function setPrefix(prefix) {
+  await fs.mkdir(CONFIG_DIR, { recursive: true });
+  await fs.writeFile(
+    CONFIG_FILE,
+    JSON.stringify({ prefix }, null, 2) + "\n",
+    "utf8",
+  );
+}
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("sessions");
+  let pairingCodeRequested = false;
 
   const sock = makeWASocket({
     auth: state,
@@ -43,6 +71,7 @@ async function startBot() {
 
     if (connection === "open") {
       console.log("SuperBot connected.");
+      console.log("Prefix:", await getPrefix());
     }
 
     if (connection === "close") {
@@ -50,7 +79,6 @@ async function startBot() {
 
       if (statusCode !== DisconnectReason.loggedOut) {
         console.log("Connection closed. Reconnecting...");
-        pairingCodeRequested = false;
         startBot().catch(console.error);
       } else {
         console.log("Logged out. Delete the sessions folder and pair again.");
@@ -69,11 +97,40 @@ async function startBot() {
         message.message.extendedTextMessage?.text ||
         "";
 
-      if (text.trim().toLowerCase() !== PREFIX + "hi") continue;
+      const prefix = await getPrefix();
+      const input = text.trim();
 
-      await sock.sendMessage(message.key.remoteJid, {
-        text: "Hi 👋",
-      });
+      if (!input.startsWith(prefix)) continue;
+
+      const body = input.slice(prefix.length).trim();
+      if (!body) continue;
+
+      const [command, ...args] = body.split(/\s+/);
+      const commandName = command.toLowerCase();
+
+      if (commandName === "setprefix") {
+        const newPrefix = args.join(" ").trim();
+
+        if (!newPrefix || newPrefix.length > 3 || /\s/.test(newPrefix)) {
+          await sock.sendMessage(message.key.remoteJid, {
+            text: "Usage: setprefix <prefix>\nExample: setprefix !",
+          });
+          continue;
+        }
+
+        await setPrefix(newPrefix);
+
+        await sock.sendMessage(message.key.remoteJid, {
+          text: `Prefix changed to: ${newPrefix}`,
+        });
+        continue;
+      }
+
+      if (commandName === "hi") {
+        await sock.sendMessage(message.key.remoteJid, {
+          text: "Hi 👋",
+        });
+      }
     }
   });
 }
