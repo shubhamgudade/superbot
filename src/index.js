@@ -65,9 +65,13 @@ async function startBot() {
     for (const message of messages) {
       if (message.key.fromMe || !message.message) continue;
 
+      const content = message.message;
       const text =
-        message.message.conversation ||
-        message.message.extendedTextMessage?.text ||
+        content.conversation ||
+        content.extendedTextMessage?.text ||
+        content.imageMessage?.caption ||
+        content.videoMessage?.caption ||
+        content.documentMessage?.caption ||
         "";
 
       const prefix = await getPrefix();
