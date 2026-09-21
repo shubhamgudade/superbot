@@ -153,8 +153,8 @@ async function animatedToSticker(input, output) {
 export default {
   name: "sticker",
   aliases: ["s", "st"],
-  async execute({ sock, message }) {
-    const media = await getMedia(message);
+  async execute({ sock, message, args }) {
+    const media = await getMedia(message);\n    const packname = args[0] || "SuperBot";\n    const author = args.slice(1).join(" ") || "SuperBot";
 
     if (!media) {
       await sock.sendMessage(message.key.remoteJid, {
@@ -187,7 +187,7 @@ export default {
       }
 
       await sock.sendMessage(message.key.remoteJid, {
-        sticker: await fs.readFile(output),
+        sticker: await fs.readFile(output),\n        packname,\n        author,
       });
     } catch (error) {
       console.error("Sticker conversion failed:", error);
