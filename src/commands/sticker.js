@@ -3,9 +3,9 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-import makeWASocket, { downloadMediaMessage } from "@whiskeysockets/baileys";
+import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import ffmpegPath from "ffmpeg-static";
-import sharp from "sharp";
+import sharp from "sharp";\nimport pino from "pino";
 
 const MAX_VIDEO_SECONDS = 6;
 
@@ -173,7 +173,7 @@ export default {
         "buffer",
         {},
         {
-          logger: sock.logger,
+          logger: pino({ level: "silent" }),
           reuploadRequest: sock.updateMediaMessage,
         },
       );
