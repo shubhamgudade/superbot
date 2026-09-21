@@ -6,10 +6,35 @@ import { spawn } from "node:child_process";
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import ffmpegPath from "ffmpeg-static";
 import pino from "pino";
-import { Sticker } from "wa-sticker-formatter";
+import crypto from "node:crypto";
+import { Image } from "node-webpmux";
 
 const MAX_VIDEO_SECONDS = 6;
 const STICKER_PACK = "+s mkc WABOT3.0";
+
+async function addStickerMetadata(webpBuffer) {
+  const image = new Image();
+  const stickerPackId = crypto.randomBytes(16).toString("hex");
+  const metadata = JSON.stringify({
+    "sticker-pack-id": stickerPackId,
+    "sticker-pack-name": STICKER_PACK,
+    "sticker-pack-publisher": "",
+    emojis: [""],
+  });
+
+  const exifHeader = Buffer.from([
+    0x49, 0x49, 0x2a, 0x00, 0x08, 0x00, 0x00, 0x00,
+    0x01, 0x00, 0x41, 0x57, 0x07, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x16, 0x00, 0x00, 0x00,
+  ]);
+  const jsonBuffer = Buffer.from(metadata, "utf8");
+  const exif = Buffer.concat([exifHeader, jsonBuffer]);
+  exif.writeUIntLE(jsonBuffer.length, 14, 4);
+
+  await image.load(webpBuffer);
+  image.exif = exif;
+  return image.save(null);
+}
 
 function getMessageContent(message) {
   let content = message?.message || message;
@@ -189,13 +214,11 @@ export default {
         await animatedToSticker(input, output);
       }
 
-      const sticker = new Sticker(output, {
-        pack: STICKER_PACK,
-        author: "",
-      });
+      const webp = await fs.readFile(output);
+      const sticker = await addStickerMetadata(webp);
 
       await sock.sendMessage(message.key.remoteJid, {
-        sticker: await sticker.toBuffer(),
+        sticker,
       });
     } catch (error) {
       console.error("Sticker conversion failed:", error);
