@@ -11,8 +11,8 @@
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
     "dotenv": "latest",
-    "ffmpeg-static": "latest",
     "pino": "latest",
-    "node-webpmux": "3.2.1"
+    "node-webpmux": "3.2.1",
+    "fluent-ffmpeg": "2.1.3"
   }
 }
