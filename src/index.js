@@ -12,6 +12,8 @@ if (!phoneNumber) {
   throw new Error("PHONE_NUMBER is required in .env");
 }
 
+let pairingCodeRequested = false;
+
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("sessions");
 
@@ -23,15 +25,22 @@ async function startBot() {
 
   sock.ev.on("creds.update", saveCreds);
 
-  if (!sock.authState.creds.registered) {
-    const code = await sock.requestPairingCode(phoneNumber);
-    console.log("\nPairing code:", code);
-    console.log(
-      "On WhatsApp: Linked devices -> Link a device -> Link with phone number.\n",
-    );
-  }
+  sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
+    if (qr && !state.creds.registered && !pairingCodeRequested) {
+      pairingCodeRequested = true;
 
-  sock.ev.on("connection.update", ({ connection, lastDisconnect }) => {
+      try {
+        const code = await sock.requestPairingCode(phoneNumber);
+        console.log("\nPairing code:", code);
+        console.log(
+          "On WhatsApp: Linked devices -> Link a device -> Link with phone number.\n",
+        );
+      } catch (error) {
+        pairingCodeRequested = false;
+        console.error("Failed to generate pairing code:", error);
+      }
+    }
+
     if (connection === "open") {
       console.log("SuperBot connected.");
     }
@@ -41,6 +50,7 @@ async function startBot() {
 
       if (statusCode !== DisconnectReason.loggedOut) {
         console.log("Connection closed. Reconnecting...");
+        pairingCodeRequested = false;
         startBot().catch(console.error);
       } else {
         console.log("Logged out. Delete the sessions folder and pair again.");
