@@ -155,20 +155,28 @@ export default {
   name: "sticker",
   aliases: ["s", "st"],
   async execute({ sock, message }) {
+    const logPrefix = "[Sticker]";
+    console.log(`${logPrefix} Command received`);
+
     const media = await getMedia(message);
 
     if (!media) {
+      console.log(`${logPrefix} No supported media found`);
       await sock.sendMessage(message.key.remoteJid, {
         text: "Send or reply to an image, video, or GIF with +sticker.",
       });
       return;
     }
 
+    console.log(`${logPrefix} Media detected: ${media.type}`);
+
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "superbot-sticker-"));
+    console.log(`${logPrefix} Work directory: ${workDir}`);
     const input = path.join(workDir, "input");
     const output = path.join(workDir, "sticker.webp");
 
     try {
+      console.log(`${logPrefix} Downloading media...`);
       const buffer = await downloadMediaMessage(
         media.message,
         "buffer",
@@ -180,26 +188,37 @@ export default {
       );
 
       await fs.writeFile(input, buffer);
+      console.log(`${logPrefix} Download complete: ${buffer.length} bytes`);
 
+      console.log(`${logPrefix} Converting ${media.type} to WebP sticker...`);
       if (media.type === "image") {
         await imageToSticker(input, output);
       } else {
         await animatedToSticker(input, output);
       }
+      console.log(`${logPrefix} Conversion complete`);
 
       const webp = await fs.readFile(output);
+      console.log(`${logPrefix} Sticker file size: ${webp.length} bytes`);
+      console.log(`${logPrefix} Adding WhatsApp sticker metadata...`);
       const sticker = await addStickerMetadata(webp);
 
+      console.log(`${logPrefix} Metadata added`);
+      console.log(`${logPrefix} Sending sticker...`);
       await sock.sendMessage(message.key.remoteJid, {
         sticker,
       });
+      console.log(`${logPrefix} Sticker sent successfully`);
     } catch (error) {
-      console.error("Sticker conversion failed:", error);
+      console.error(`${logPrefix} ERROR`);
+      console.error(error);
       await sock.sendMessage(message.key.remoteJid, {
         text: "I couldn't convert that media into a sticker.",
       });
     } finally {
+      console.log(`${logPrefix} Cleaning temporary files`);
       await fs.rm(workDir, { recursive: true, force: true });
+      console.log(`${logPrefix} Done`);
     }
   },
 };
