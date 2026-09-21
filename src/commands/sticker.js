@@ -12,6 +12,17 @@ import webpmux from "node-webpmux";
 const MAX_VIDEO_SECONDS = 6;
 const STICKER_PACK = "+s mkc WABOT3.0";
 
+const FLAG_COLORS = {
+  lgbt: ["#E40303", "#FF8C00", "#FFED00", "#008026", "#004DFF", "#750787"],
+  lesb: ["#D52D00", "#EF7627", "#FF9A56", "#FFFFFF", "#D162A4", "#B55690", "#A30262"],
+  gay: ["#078D70", "#26CEAA", "#98E8C1", "#FFFFFF", "#7BADE2", "#5049CC", "#3D1A78"],
+  trns: ["#5BCEFA", "#F5A9B8", "#FFFFFF", "#F5A9B8", "#5BCEFA"],
+  bis: ["#D60270", "#D60270", "#9B4F96", "#0038A8", "#0038A8"],
+  qer: ["#B57EDC", "#FFFFFF", "#008000", "#000000", "#FF69B4"],
+};
+
+const FILTERS = new Set(["bw", "lgbt", "lesb", "gay", "trns", "bis", "neg", "qer"]);
+
 async function addStickerMetadata(webpBuffer) {
   const { Image } = webpmux;
   const image = new Image();
@@ -112,7 +123,28 @@ async function getMedia(message) {
   return null;
 }
 
-function runFfmpeg(input, output, animated = false) {
+function buildFilter(filter, animated) {
+  const base = animated
+    ? "fps=15,scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0"
+    : "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0";
+
+  if (filter === "bw") return `${base},hue=s=0`;
+  if (filter === "neg") return `${base},negate`;
+
+  const colors = FLAG_COLORS[filter];
+  if (!colors) return base;
+
+  const bandHeight = 512 / colors.length;
+  const boxes = colors.map((color, index) => {
+    const y = Math.round(index * bandHeight);
+    const h = Math.ceil(bandHeight);
+    return `drawbox=x=0:y=${y}:w=512:h=${h}:color=${color}@0.35:t=fill`;
+  });
+
+  return `${base},format=rgba,${boxes.join(",")}`;
+}
+
+function runFfmpeg(input, output, animated = false, filter = null) {
   return new Promise((resolve, reject) => {
     let command = ffmpeg(input)
       .outputOptions([
@@ -120,11 +152,7 @@ function runFfmpeg(input, output, animated = false) {
         "-compression_level 4",
         "-an",
       ])
-      .videoFilters(
-        animated
-          ? "fps=15,scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0"
-          : "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0"
-      );
+      .videoFilters(buildFilter(filter, animated));
 
     if (animated) {
       command = command
@@ -143,12 +171,12 @@ function runFfmpeg(input, output, animated = false) {
   });
 }
 
-async function imageToSticker(input, output) {
-  await runFfmpeg(input, output, false);
+async function imageToSticker(input, output, filter) {
+  await runFfmpeg(input, output, false, filter);
 }
 
-async function animatedToSticker(input, output) {
-  await runFfmpeg(input, output, true);
+async function animatedToSticker(input, output, filter) {
+  await runFfmpeg(input, output, true, filter);
 }
 
 export default {
@@ -157,6 +185,16 @@ export default {
   async execute({ sock, message, args, prefix }) {
     const logPrefix = "[Sticker]";
     console.log(`${logPrefix} Command received`);
+    const requestedFilter = (args?.[0] || "").toLowerCase();
+    const filter = FILTERS.has(requestedFilter) ? requestedFilter : null;
+
+    if (requestedFilter && !filter) {
+      console.log(`${logPrefix} Unknown filter: ${requestedFilter}`);
+    }
+
+    if (filter) {
+      console.log(`${logPrefix} Filter selected: ${filter}`);
+    }
 
     let media = await getMedia(message);
 
@@ -214,9 +252,9 @@ export default {
 
       console.log(`${logPrefix} Converting ${media.type} to WebP sticker...`);
       if (media.type === "image") {
-        await imageToSticker(input, output);
+        await imageToSticker(input, output, filter);
       } else {
-        await animatedToSticker(input, output);
+        await animatedToSticker(input, output, filter);
       }
       console.log(`${logPrefix} Conversion complete`);
 
