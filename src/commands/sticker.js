@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import ffmpegPath from "ffmpeg-static";
-import sharp from "sharp";\nimport pino from "pino";
+import sharp from "sharp";\nimport pino from "pino";\nimport { Sticker } from "wa-sticker-formatter";
 
 const MAX_VIDEO_SECONDS = 6;
 
@@ -153,7 +153,7 @@ async function animatedToSticker(input, output) {
 export default {
   name: "sticker",
   aliases: ["s", "st"],
-  async execute({ sock, message, args }) {
+  async execute({ sock, message }) {
     const media = await getMedia(message);\n    const packname = args[0] || "SuperBot";\n    const author = args.slice(1).join(" ") || "SuperBot";
 
     if (!media) {
