@@ -53,7 +53,7 @@ function getQuotedText(message) {
   ).trim();
 }
 
-function wrapText(text, maxChars = 22) {
+function wrapText(text, maxChars = 18) {
   const words = text.replace(/\s+/g, " ").trim().split(" ");
   const lines = [];
   let line = "";
@@ -73,7 +73,7 @@ function wrapText(text, maxChars = 22) {
   }
 
   if (line) lines.push(line);
-  return lines.slice(0, 8).join("\n");
+  return lines.slice(0, 11).join("\n");
 }
 
 async function ensureTemplate() {
@@ -129,20 +129,19 @@ async function createOpnoImage(text, output) {
     await fs.writeFile(textFile, wrapText(text), "utf8");
     const font = await findFont();
 
-    console.log("[OpNo] Building chat bubble...");
+    // Draw the reply text first. The dustbin is composited afterwards,
+    // so the bin physically sits in front of / covers the text.
+    console.log("[OpNo] Drawing text behind the dustbin...");
     await runFfmpeg(
       ffmpeg(TEMPLATE_FILE)
         .outputOptions(["-frames:v 1", "-q:v 3"])
         .videoFilters([
-          "drawbox=x=285:y=145:w=265:h=345:color=white@1:t=fill",
-          "drawbox=x=292:y=205:w=245:h=125:color=0xDCF8C6@1:t=fill",
-          "drawbox=x=292:y=315:w=32:h=28:color=0xDCF8C6@1:t=fill",
-          `drawtext=fontfile='${font}':textfile='${textFile}':fontcolor=black:fontsize=21:line_spacing=5:x=307:y=220`,
+          `drawtext=fontfile='${font}':textfile='${textFile}':fontcolor=black:fontsize=21:line_spacing=6:x=300:y=175`,
         ])
         .save(base),
     );
 
-    console.log("[OpNo] Extracting the original bin...");
+    console.log("[OpNo] Extracting the dustbin...");
     await runFfmpeg(
       ffmpeg(TEMPLATE_FILE)
         .outputOptions(["-frames:v 1"])
@@ -153,7 +152,9 @@ async function createOpnoImage(text, output) {
         .save(bin),
     );
 
-    console.log("[OpNo] Putting the bin above the chat bubble...");
+    // IMPORTANT: bin is composited after the text, making it the
+    // foreground layer and leaving the reply text behind it.
+    console.log("[OpNo] Putting the dustbin in front of the text...");
     await runFfmpeg(
       ffmpeg(base)
         .input(bin)
@@ -180,7 +181,7 @@ export default {
 
     if (!text) {
       await sock.sendMessage(message.key.remoteJid, {
-        text: "Reply to a text message with !opno.",
+        text: "Reply to a text message with +opno.",
       });
       return;
     }
@@ -189,7 +190,9 @@ export default {
       console.log(`${logPrefix} Quoted text: ${text}`);
       await ensureTemplate();
 
-      const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "superbot-opno-output-"));
+      const workDir = await fs.mkdtemp(
+        path.join(os.tmpdir(), "superbot-opno-output-"),
+      );
       const output = path.join(workDir, "opno.jpg");
 
       try {
@@ -198,10 +201,12 @@ export default {
 
         const buffer = await fs.readFile(output);
         console.log(`${logPrefix} Meme created: ${buffer.length} bytes`);
+
         await sock.sendMessage(message.key.remoteJid, {
           image: buffer,
           mimetype: "image/jpeg",
         });
+
         console.log(`${logPrefix} Meme sent successfully`);
       } finally {
         await fs.rm(workDir, { recursive: true, force: true });
@@ -209,6 +214,7 @@ export default {
     } catch (error) {
       console.error(`${logPrefix} ERROR`);
       console.error(error);
+
       await sock.sendMessage(message.key.remoteJid, {
         text: "I couldn't create the opinion meme.",
       });
