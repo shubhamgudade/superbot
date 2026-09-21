@@ -5,7 +5,9 @@ import { spawn } from "node:child_process";
 
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import ffmpegPath from "ffmpeg-static";
-import sharp from "sharp";\nimport pino from "pino";\nimport { Sticker } from "wa-sticker-formatter";
+import sharp from "sharp";
+import pino from "pino";
+import { Sticker } from "wa-sticker-formatter";
 
 const MAX_VIDEO_SECONDS = 6;
 
@@ -36,7 +38,11 @@ function getMessageContent(message) {
 function getMediaType(content) {
   if (!content) return null;
 
-  if (content.imageMessage) {\n    return content.imageMessage.mimetype?.toLowerCase() === "image/gif"\n      ? "gif"\n      : "image";\n  }
+  if (content.imageMessage) {
+    return content.imageMessage.mimetype?.toLowerCase() === "image/gif"
+      ? "gif"
+      : "image";
+  }
   if (content.videoMessage) return "video";
 
   if (
@@ -154,7 +160,9 @@ export default {
   name: "sticker",
   aliases: ["s", "st"],
   async execute({ sock, message }) {
-    const media = await getMedia(message);\n    const packname = args[0] || "SuperBot";\n    const author = args.slice(1).join(" ") || "SuperBot";
+    const media = await getMedia(message);
+    const packname = args[0] || "SuperBot";
+    const author = args.slice(1).join(" ") || "SuperBot";
 
     if (!media) {
       await sock.sendMessage(message.key.remoteJid, {
@@ -187,7 +195,9 @@ export default {
       }
 
       await sock.sendMessage(message.key.remoteJid, {
-        sticker: await fs.readFile(output),\n        packname,\n        author,
+        sticker: await fs.readFile(output),
+        packname,
+        author,
       });
     } catch (error) {
       console.error("Sticker conversion failed:", error);
