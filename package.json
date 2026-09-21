@@ -13,6 +13,7 @@
     "dotenv": "latest",
     "ffmpeg-static": "latest",
     "pino": "latest",
-    "sharp": "latest"
+    "sharp": "latest",
+    "wa-sticker-formatter": "4.4.4"
   }
 }
