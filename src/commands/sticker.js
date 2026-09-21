@@ -5,29 +5,19 @@ import { spawn } from "node:child_process";
 
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import ffmpegPath from "ffmpeg-static";
-import sharp from "sharp";
 import pino from "pino";
 import { Sticker } from "wa-sticker-formatter";
 
 const MAX_VIDEO_SECONDS = 6;
+const STICKER_PACK = "+s mkc WABOT3.0";
 
 function getMessageContent(message) {
   let content = message?.message || message;
-
   if (!content) return null;
 
-  if (content.ephemeralMessage?.message) {
-    content = content.ephemeralMessage.message;
-  }
-
-  if (content.viewOnceMessage?.message) {
-    content = content.viewOnceMessage.message;
-  }
-
-  if (content.viewOnceMessageV2?.message) {
-    content = content.viewOnceMessageV2.message;
-  }
-
+  if (content.ephemeralMessage?.message) content = content.ephemeralMessage.message;
+  if (content.viewOnceMessage?.message) content = content.viewOnceMessage.message;
+  if (content.viewOnceMessageV2?.message) content = content.viewOnceMessageV2.message;
   if (content.viewOnceMessageV2Extension?.message) {
     content = content.viewOnceMessageV2Extension.message;
   }
@@ -43,6 +33,7 @@ function getMediaType(content) {
       ? "gif"
       : "image";
   }
+
   if (content.videoMessage) return "video";
 
   if (
@@ -80,9 +71,7 @@ async function getMedia(message) {
   const directContent = getMessageContent(message);
   const directType = getMediaType(directContent);
 
-  if (directType) {
-    return { message, type: directType };
-  }
+  if (directType) return { message, type: directType };
 
   const quotedContent = getQuotedContent(message);
   const quotedType = getMediaType(quotedContent);
@@ -114,22 +103,30 @@ function runFfmpeg(args) {
     child.on("close", (code) => {
       if (code === 0) {
         resolve();
-        return;
+      } else {
+        reject(new Error(stderr || `ffmpeg exited with code ${code}`));
       }
-
-      reject(new Error(stderr || `ffmpeg exited with code ${code}`));
     });
   });
 }
 
 async function imageToSticker(input, output) {
-  await sharp(input)
-    .resize(512, 512, {
-      fit: "contain",
-      background: { r: 0, g: 0, b: 0, alpha: 0 },
-    })
-    .webp({ quality: 90 })
-    .toFile(output);
+  await runFfmpeg([
+    "-y",
+    "-i",
+    input,
+    "-vf",
+    "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0",
+    "-frames:v",
+    "1",
+    "-c:v",
+    "libwebp",
+    "-q:v",
+    "70",
+    "-compression_level",
+    "4",
+    output,
+  ]);
 }
 
 async function animatedToSticker(input, output) {
@@ -161,8 +158,6 @@ export default {
   aliases: ["s", "st"],
   async execute({ sock, message }) {
     const media = await getMedia(message);
-    const packname = args[0] || "SuperBot";
-    const author = args.slice(1).join(" ") || "SuperBot";
 
     if (!media) {
       await sock.sendMessage(message.key.remoteJid, {
@@ -194,10 +189,13 @@ export default {
         await animatedToSticker(input, output);
       }
 
+      const sticker = new Sticker(output, {
+        pack: STICKER_PACK,
+        author: "",
+      });
+
       await sock.sendMessage(message.key.remoteJid, {
-        sticker: await fs.readFile(output),
-        packname,
-        author,
+        sticker: await sticker.toBuffer(),
       });
     } catch (error) {
       console.error("Sticker conversion failed:", error);
