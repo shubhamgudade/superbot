@@ -11,6 +11,8 @@
   "dependencies": {
     "@whiskeysockets/baileys": "latest",
     "dotenv": "latest",
-    "pino": "latest"
+    "ffmpeg-static": "latest",
+    "pino": "latest",
+    "sharp": "latest"
   }
 }
