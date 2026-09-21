@@ -4,9 +4,24 @@ import path from "node:path";
 
 import ffmpeg from "fluent-ffmpeg";
 
-const TEMPLATE_URL = "https://i.imgflip.com/8wm7xw.jpg";
-const TEMPLATE_FILE = path.join("data", "opno-template.jpg");
+const TEMPLATE_FILE = path.join("data", "dog-template.jpg");
+const DUSTBIN_FILE = path.join("data", "dustbin.png");
 
+// Bubble config — tweak these if placement feels off
+const BUBBLE = {
+  x: 255,
+  y: 155,
+  w: 210,
+  h: 100,
+  pad: 12,
+};
+
+const DUSTBIN = {
+  x: 258,
+  y: 235,
+  w: 220,
+  h: 220,
+};
 function unwrapMessage(message) {
   let content = message || null;
 
@@ -53,7 +68,7 @@ function getQuotedText(message) {
   ).trim();
 }
 
-function wrapText(text, maxChars = 18) {
+function wrapText(text, maxChars = 14) {
   const words = text.replace(/\s+/g, " ").trim().split(" ");
   const lines = [];
   let line = "";
@@ -63,7 +78,6 @@ function wrapText(text, maxChars = 18) {
       line = word;
       continue;
     }
-
     if ((line + " " + word).length <= maxChars) {
       line += " " + word;
     } else {
@@ -73,27 +87,7 @@ function wrapText(text, maxChars = 18) {
   }
 
   if (line) lines.push(line);
-  return lines.slice(0, 11).join("\n");
-}
-
-async function ensureTemplate() {
-  try {
-    await fs.access(TEMPLATE_FILE);
-    return;
-  } catch {
-    // Download on first use.
-  }
-
-  console.log("[OpNo] Downloading meme template...");
-  await fs.mkdir(path.dirname(TEMPLATE_FILE), { recursive: true });
-
-  const response = await fetch(TEMPLATE_URL);
-  if (!response.ok) {
-    throw new Error(`Template download failed: HTTP ${response.status}`);
-  }
-
-  await fs.writeFile(TEMPLATE_FILE, Buffer.from(await response.arrayBuffer()));
-  console.log("[OpNo] Template saved");
+  return lines.slice(0, 6).join("\n");
 }
 
 async function findFont() {
@@ -110,7 +104,7 @@ async function findFont() {
     } catch {}
   }
 
-  throw new Error("No usable Android font was found.");
+  throw new Error("No usable font found.");
 }
 
 function runFfmpeg(command) {
@@ -122,49 +116,44 @@ function runFfmpeg(command) {
 async function createOpnoImage(text, output) {
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "superbot-opno-"));
   const textFile = path.join(workDir, "text.txt");
-  const base = path.join(workDir, "base.jpg");
-  const bin = path.join(workDir, "bin.png");
+  const withBubble = path.join(workDir, "bubble.jpg");
 
   try {
-    await fs.writeFile(textFile, wrapText(text), "utf8");
+    // in wrapText call inside createOpnoImage
+const wrapped = wrapText(text, 12);
+    await fs.writeFile(textFile, wrapped, "utf8");
     const font = await findFont();
 
-    // Draw the reply text first. The dustbin is composited afterwards,
-    // so the bin physically sits in front of / covers the text.
-    console.log("[OpNo] Drawing text behind the dustbin...");
+    const { x, y, w, h, pad } = BUBBLE;
+
+    console.log("[OpNo] Step 1 — drawing bubble...");
     await runFfmpeg(
       ffmpeg(TEMPLATE_FILE)
-        .outputOptions(["-frames:v 1", "-q:v 3"])
+        .outputOptions(["-frames:v 1", "-q:v 2"])
         .videoFilters([
-          `drawtext=fontfile='${font}':textfile='${textFile}':fontcolor=black:fontsize=21:line_spacing=6:x=300:y=175`,
+          // White bubble box, sharp corners, simple and reliable
+          `drawbox=x=${x}:y=${y}:w=${w}:h=${h}:color=white@1.0:t=fill`,
+          // Small tail pointing down
+          `drawbox=x=${x + 15}:y=${y + h}:w=14:h=10:color=white@1.0:t=fill`,
+          // Text
+          `drawtext=fontfile='${font}':textfile='${textFile}':fontcolor=black:fontsize=16:line_spacing=12:x=${x + pad}:y=${y + pad}`,
         ])
-        .save(base),
+        .save(withBubble),
     );
 
-    console.log("[OpNo] Extracting the dustbin...");
+    console.log("[OpNo] Step 2 — overlaying dustbin...");
     await runFfmpeg(
-      ffmpeg(TEMPLATE_FILE)
-        .outputOptions(["-frames:v 1"])
-        .videoFilters([
-          "crop=225:325:285:145",
-          "chromakey=0xFFFFFF:0.18:0.08",
-        ])
-        .save(bin),
-    );
-
-    // IMPORTANT: bin is composited after the text, making it the
-    // foreground layer and leaving the reply text behind it.
-    console.log("[OpNo] Putting the dustbin in front of the text...");
-    await runFfmpeg(
-      ffmpeg(base)
-        .input(bin)
+      ffmpeg(withBubble)
+        .input(DUSTBIN_FILE)
         .complexFilter([
-          "[1:v]scale=225:325[bin]",
-          "[0:v][bin]overlay=285:155:format=auto",
+          `[1:v]scale=${DUSTBIN.w}:${DUSTBIN.h}[bin]`,
+          `[0:v][bin]overlay=${DUSTBIN.x}:${DUSTBIN.y}:format=auto`,
         ])
-        .outputOptions(["-frames:v 1", "-q:v 3"])
+        .outputOptions(["-frames:v 1", "-q:v 2"])
         .save(output),
     );
+
+    console.log("[OpNo] Both steps done, output at:", output);
   } finally {
     await fs.rm(workDir, { recursive: true, force: true });
   }
@@ -188,7 +177,6 @@ export default {
 
     try {
       console.log(`${logPrefix} Quoted text: ${text}`);
-      await ensureTemplate();
 
       const workDir = await fs.mkdtemp(
         path.join(os.tmpdir(), "superbot-opno-output-"),
@@ -207,16 +195,15 @@ export default {
           mimetype: "image/jpeg",
         });
 
-        console.log(`${logPrefix} Meme sent successfully`);
+        console.log(`${logPrefix} Meme sent`);
       } finally {
         await fs.rm(workDir, { recursive: true, force: true });
       }
     } catch (error) {
-      console.error(`${logPrefix} ERROR`);
-      console.error(error);
+      console.error(`${logPrefix} ERROR`, error);
 
       await sock.sendMessage(message.key.remoteJid, {
-        text: "I couldn't create the opinion meme.",
+        text: "couldn't create the meme.",
       });
     }
   },
