@@ -1,44 +1,17 @@
 import "dotenv/config";
-import fs from "node:fs/promises";
-import path from "node:path";
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
 import pino from "pino";
 
-const DEFAULT_PREFIX = "+";
-const CONFIG_DIR = "data";
-const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
+import { getPrefix } from "./config/prefix.js";
+import { getCommand } from "./commands/index.js";
 
 const phoneNumber = (process.env.PHONE_NUMBER || "").replace(/\D/g, "");
 
 if (!phoneNumber) {
   throw new Error("PHONE_NUMBER is required in .env");
-}
-
-async function getPrefix() {
-  try {
-    const raw = await fs.readFile(CONFIG_FILE, "utf8");
-    const config = JSON.parse(raw);
-
-    if (typeof config.prefix === "string" && config.prefix.length > 0) {
-      return config.prefix;
-    }
-  } catch {
-    // Use the default when the config file does not exist or is invalid.
-  }
-
-  return DEFAULT_PREFIX;
-}
-
-async function setPrefix(prefix) {
-  await fs.mkdir(CONFIG_DIR, { recursive: true });
-  await fs.writeFile(
-    CONFIG_FILE,
-    JSON.stringify({ prefix }, null, 2) + "\n",
-    "utf8",
-  );
 }
 
 async function startBot() {
@@ -105,30 +78,24 @@ async function startBot() {
       const body = input.slice(prefix.length).trim();
       if (!body) continue;
 
-      const [command, ...args] = body.split(/\s+/);
-      const commandName = command.toLowerCase();
+      const [commandName, ...args] = body.split(/\s+/);
+      const command = getCommand(commandName);
 
-      if (commandName === "setprefix") {
-        const newPrefix = args.join(" ").trim();
+      if (!command) continue;
 
-        if (!newPrefix || newPrefix.length > 3 || /\s/.test(newPrefix)) {
-          await sock.sendMessage(message.key.remoteJid, {
-            text: "Usage: setprefix <prefix>\nExample: setprefix !",
-          });
-          continue;
-        }
-
-        await setPrefix(newPrefix);
-
-        await sock.sendMessage(message.key.remoteJid, {
-          text: `Prefix changed to: ${newPrefix}`,
+      try {
+        await command.execute({
+          sock,
+          message,
+          args,
+          commandName: commandName.toLowerCase(),
+          prefix,
         });
-        continue;
-      }
+      } catch (error) {
+        console.error(`Command failed: ${command.name}`, error);
 
-      if (commandName === "hi") {
         await sock.sendMessage(message.key.remoteJid, {
-          text: "Hi 👋",
+          text: "Something went wrong while running that command.",
         });
       }
     }
