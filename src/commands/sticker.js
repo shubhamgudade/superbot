@@ -7,12 +7,13 @@ import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import ffmpegPath from "ffmpeg-static";
 import pino from "pino";
 import crypto from "node:crypto";
-import { Image } from "node-webpmux";
+import webpmux from "node-webpmux";
 
 const MAX_VIDEO_SECONDS = 6;
 const STICKER_PACK = "+s mkc WABOT3.0";
 
 async function addStickerMetadata(webpBuffer) {
+  const { Image } = webpmux;
   const image = new Image();
   const stickerPackId = crypto.randomBytes(16).toString("hex");
   const metadata = JSON.stringify({
