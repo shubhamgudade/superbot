@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
+import path from "node:path";
+
 import ffmpeg from "fluent-ffmpeg";
 
 const TEMPLATE_URL = "https://i.imgflip.com/8wm7xw.jpg";
@@ -14,22 +15,18 @@ function unwrapMessage(message) {
       content = content.ephemeralMessage.message;
       continue;
     }
-
     if (content.viewOnceMessage?.message) {
       content = content.viewOnceMessage.message;
       continue;
     }
-
     if (content.viewOnceMessageV2?.message) {
       content = content.viewOnceMessageV2.message;
       continue;
     }
-
     if (content.viewOnceMessageV2Extension?.message) {
       content = content.viewOnceMessageV2Extension.message;
       continue;
     }
-
     break;
   }
 
@@ -56,8 +53,8 @@ function getQuotedText(message) {
   ).trim();
 }
 
-function wrapText(text, maxChars = 20) {
-  const words = text.split(/\s+/);
+function wrapText(text, maxChars = 22) {
+  const words = text.replace(/\s+/g, " ").trim().split(" ");
   const lines = [];
   let line = "";
 
@@ -76,8 +73,7 @@ function wrapText(text, maxChars = 20) {
   }
 
   if (line) lines.push(line);
-
-  return lines.join("\n").slice(0, 220);
+  return lines.slice(0, 8).join("\n");
 }
 
 async function ensureTemplate() {
@@ -96,9 +92,8 @@ async function ensureTemplate() {
     throw new Error(`Template download failed: HTTP ${response.status}`);
   }
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  await fs.writeFile(TEMPLATE_FILE, buffer);
-  console.log(`[OpNo] Template saved: ${buffer.length} bytes`);
+  await fs.writeFile(TEMPLATE_FILE, Buffer.from(await response.arrayBuffer()));
+  console.log("[OpNo] Template saved");
 }
 
 async function findFont() {
@@ -112,35 +107,63 @@ async function findFont() {
     try {
       await fs.access(font);
       return font;
-    } catch {
-      // Try the next font.
-    }
+    } catch {}
   }
 
-  throw new Error("No usable Android font was found for +opno.");
+  throw new Error("No usable Android font was found.");
+}
+
+function runFfmpeg(command) {
+  return new Promise((resolve, reject) => {
+    command.on("end", resolve).on("error", reject);
+  });
 }
 
 async function createOpnoImage(text, output) {
   const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "superbot-opno-"));
   const textFile = path.join(workDir, "text.txt");
+  const base = path.join(workDir, "base.jpg");
+  const bin = path.join(workDir, "bin.png");
 
   try {
     await fs.writeFile(textFile, wrapText(text), "utf8");
     const font = await findFont();
 
-    await new Promise((resolve, reject) => {
+    console.log("[OpNo] Building chat bubble...");
+    await runFfmpeg(
       ffmpeg(TEMPLATE_FILE)
-        .outputOptions([
-          "-frames:v 1",
-          "-q:v 3",
-        ])
+        .outputOptions(["-frames:v 1", "-q:v 3"])
         .videoFilters([
-          `drawtext=fontfile='${font}':textfile='${textFile}':fontcolor=black:fontsize=28:line_spacing=4:box=1:boxcolor=white@0.88:boxborderw=10:x=385:y=305`,
+          "drawbox=x=285:y=145:w=265:h=345:color=white@1:t=fill",
+          "drawbox=x=292:y=205:w=245:h=125:color=0xDCF8C6@1:t=fill",
+          "drawbox=x=292:y=315:w=32:h=28:color=0xDCF8C6@1:t=fill",
+          `drawtext=fontfile='${font}':textfile='${textFile}':fontcolor=black:fontsize=21:line_spacing=5:x=307:y=220`,
         ])
-        .on("end", resolve)
-        .on("error", reject)
-        .save(output);
-    });
+        .save(base),
+    );
+
+    console.log("[OpNo] Extracting the original bin...");
+    await runFfmpeg(
+      ffmpeg(TEMPLATE_FILE)
+        .outputOptions(["-frames:v 1"])
+        .videoFilters([
+          "crop=225:325:285:145",
+          "chromakey=0xFFFFFF:0.18:0.08",
+        ])
+        .save(bin),
+    );
+
+    console.log("[OpNo] Putting the bin above the chat bubble...");
+    await runFfmpeg(
+      ffmpeg(base)
+        .input(bin)
+        .complexFilter([
+          "[1:v]scale=225:325[bin]",
+          "[0:v][bin]overlay=285:155:format=auto",
+        ])
+        .outputOptions(["-frames:v 1", "-q:v 3"])
+        .save(output),
+    );
   } finally {
     await fs.rm(workDir, { recursive: true, force: true });
   }
@@ -157,7 +180,7 @@ export default {
 
     if (!text) {
       await sock.sendMessage(message.key.remoteJid, {
-        text: "Reply to a text message with +opno.",
+        text: "Reply to a text message with !opno.",
       });
       return;
     }
@@ -175,13 +198,10 @@ export default {
 
         const buffer = await fs.readFile(output);
         console.log(`${logPrefix} Meme created: ${buffer.length} bytes`);
-        console.log(`${logPrefix} Sending meme...`);
-
         await sock.sendMessage(message.key.remoteJid, {
           image: buffer,
           mimetype: "image/jpeg",
         });
-
         console.log(`${logPrefix} Meme sent successfully`);
       } finally {
         await fs.rm(workDir, { recursive: true, force: true });
@@ -189,7 +209,6 @@ export default {
     } catch (error) {
       console.error(`${logPrefix} ERROR`);
       console.error(error);
-
       await sock.sendMessage(message.key.remoteJid, {
         text: "I couldn't create the opinion meme.",
       });
