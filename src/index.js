@@ -7,6 +7,7 @@ import pino from "pino";
 
 import { getPrefix } from "./config/prefix.js";
 import { getCommand } from "./commands/index.js";
+import { handleImageTrigger } from "./triggers/imageTriggers.js";
 
 const phoneNumber = (process.env.PHONE_NUMBER || "").replace(/\D/g, "");
 
@@ -77,7 +78,10 @@ async function startBot() {
       const prefix = await getPrefix();
       const input = text.trim();
 
-      if (!input.startsWith(prefix)) continue;
+      if (!input.startsWith(prefix)) {
+        await handleImageTrigger({ sock, message, text });
+        continue;
+      }
 
       const body = input.slice(prefix.length).trim();
       if (!body) continue;
