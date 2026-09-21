@@ -4,8 +4,8 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
-import ffmpegPath from "ffmpeg-static";
 import pino from "pino";
+import ffmpeg from "fluent-ffmpeg";
 import crypto from "node:crypto";
 import webpmux from "node-webpmux";
 
@@ -112,71 +112,43 @@ async function getMedia(message) {
   return null;
 }
 
-function runFfmpeg(args) {
+function runFfmpeg(input, output, animated = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(ffmpegPath, args, {
-      stdio: ["ignore", "ignore", "pipe"],
-    });
+    let command = ffmpeg(input)
+      .outputOptions([
+        "-c:v libwebp",
+        "-compression_level 4",
+        "-an",
+      ])
+      .videoFilters(
+        animated
+          ? "fps=15,scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0"
+          : "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0"
+      );
 
-    let stderr = "";
+    if (animated) {
+      command = command
+        .duration(MAX_VIDEO_SECONDS)
+        .outputOptions(["-loop 0", "-q:v 60"]);
+    } else {
+      command = command
+        .frames(1)
+        .outputOptions(["-q:v 70"]);
+    }
 
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", reject);
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(stderr || `ffmpeg exited with code ${code}`));
-      }
-    });
+    command
+      .on("end", resolve)
+      .on("error", reject)
+      .save(output);
   });
 }
 
 async function imageToSticker(input, output) {
-  await runFfmpeg([
-    "-y",
-    "-i",
-    input,
-    "-vf",
-    "scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0",
-    "-frames:v",
-    "1",
-    "-c:v",
-    "libwebp",
-    "-q:v",
-    "70",
-    "-compression_level",
-    "4",
-    output,
-  ]);
+  await runFfmpeg(input, output, false);
 }
 
 async function animatedToSticker(input, output) {
-  await runFfmpeg([
-    "-y",
-    "-i",
-    input,
-    "-t",
-    String(MAX_VIDEO_SECONDS),
-    "-vf",
-    "fps=15,scale=512:512:force_original_aspect_ratio=decrease,pad=512:512:(ow-iw)/2:(oh-ih)/2:color=black@0",
-    "-c:v",
-    "libwebp",
-    "-lossless",
-    "0",
-    "-q:v",
-    "60",
-    "-compression_level",
-    "4",
-    "-loop",
-    "0",
-    "-an",
-    output,
-  ]);
+  await runFfmpeg(input, output, true);
 }
 
 export default {
