@@ -1,7 +1,7 @@
 export default {
   name: "digimon",
   aliases: ["digi"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     try {
       const response = await fetch("https://digimon-api.vercel.app/api/digimon");
 
