@@ -1,7 +1,7 @@
 export default {
   name: "wiki",
   aliases: ["wikipedia"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     if(!args.length) return sock.sendMessage(message.key.remoteJid,{text:"❌ Usage: +wiki search term"},{quoted:message});
     const url=new URL("https://en.wikipedia.org/w/api.php");
     url.searchParams.set("action","query"); url.searchParams.set("list","search"); url.searchParams.set("srsearch",args.join(" ")); url.searchParams.set("srlimit","1"); url.searchParams.set("format","json"); url.searchParams.set("origin","*");
