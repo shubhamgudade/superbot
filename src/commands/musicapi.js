@@ -1,7 +1,7 @@
 export default {
   name: "musicapi",
   aliases: ["jiosaavn"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const base=process.env.JIOSAAVN_API_URL;
     if(!base) return sock.sendMessage(message.key.remoteJid,{text:"❌ JioSaavn API is a self-hosted project. Set JIOSAAVN_API_URL in .env first."},{quoted:message});
     if(!args.length) return sock.sendMessage(message.key.remoteJid,{text:"❌ Usage: +musicapi <song name or JioSaavn URL>"},{quoted:message});
