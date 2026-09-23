@@ -1,7 +1,7 @@
 export default {
   name: "abhi",
   aliases: ["abhiapi"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const type = (args[0] || "joke").toLowerCase();
 
     const endpoints = {
