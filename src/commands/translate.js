@@ -1,7 +1,7 @@
 export default {
   name: "translate",
   aliases: ["tr"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const target=args[0]; const text=args.slice(1).join(" ");
     if(!target || !text) return sock.sendMessage(message.key.remoteJid,{text:"❌ Usage: +translate <language> <text>"},{quoted:message});
     try {
