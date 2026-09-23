@@ -1,7 +1,7 @@
 export default {
   name: "joke",
   aliases: ["jokes"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const category = args[0] || "Any";
 
     try {
