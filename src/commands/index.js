@@ -8,11 +8,12 @@ import pokemon from "./pokemon.js";
 import avatar from "./avatar.js";
 import chuck from "./chuck.js";
 import fact from "./fact.js";
+import digimon from "./digimon.js";
 import { wanted, criminal, jail } from "./photoeffects.js";
 
 const commands = new Map();
 
-for (const command of [hi, setprefix, sticker, opno, kirk, carbon, pokemon, avatar, chuck, fact, wanted, criminal, jail]) {
+for (const command of [hi, setprefix, sticker, opno, kirk, carbon, pokemon, avatar, chuck, fact, digimon, wanted, criminal, jail]) {
   commands.set(command.name, command);
 
   for (const alias of command.aliases || []) {
