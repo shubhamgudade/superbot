@@ -68,9 +68,10 @@ async function getImageBuffer(message) {
 async function uploadToCatbox(buffer) {
   const form = new FormData();
   form.append("reqtype", "fileupload");
+  form.append("time", "1h");
   form.append("fileToUpload", new Blob([buffer], { type: "image/jpeg" }), "image.jpg");
 
-  const response = await fetch("https://catbox.moe/user/api.php", {
+  const response = await fetch("https://litterbox.catbox.moe/resources/internals/api.php", {
     method: "POST",
     body: form,
   });
