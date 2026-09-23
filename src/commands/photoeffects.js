@@ -97,17 +97,25 @@ async function uploadImage(buffer) {
   const form = new FormData();
   form.append("file", new Blob([png], { type: "image/png" }), "avatar.png");
 
-  const response = await fetch("https://0x0.st", {
+  const response = await fetch("https://imgdb.io/api/v1/upload?ttl=3600", {
     method: "POST",
     body: form,
   });
 
-  const url = (await response.text()).trim();
-  if (!response.ok || !url.startsWith("http")) {
-    throw new Error(`Image upload failed: ${url.slice(0, 200)}`);
+  const body = await response.text();
+  let data;
+
+  try {
+    data = JSON.parse(body);
+  } catch {
+    throw new Error(`Image upload returned invalid JSON: ${body.slice(0, 200)}`);
   }
 
-  return url;
+  if (!response.ok || !data.url) {
+    throw new Error(`Image upload failed: ${data.error || body.slice(0, 200)}`);
+  }
+
+  return data.url;
 }
 
 async function getSourceImage(message) {
