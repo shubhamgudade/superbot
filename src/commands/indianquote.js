@@ -1,7 +1,7 @@
 export default {
   name: "iquote",
   aliases: ["indianquote","quote"],
-  async execute(sock, message) {
+  async execute({ sock, message }) {
     try {
       const r=await fetch("https://indian-quotes-api.vercel.app/api/quotes/random");
       if(!r.ok) throw new Error(`HTTP ${r.status}`);
