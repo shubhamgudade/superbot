@@ -1,7 +1,7 @@
 export default {
   name: "card",
   aliases: ["tcg"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     try {
       let card;
 
