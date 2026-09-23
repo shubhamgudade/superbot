@@ -1,7 +1,7 @@
 export default {
   name: "movie",
   aliases: ["imdb"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const query = args.join(" ").trim();
 
     if (!query) {
