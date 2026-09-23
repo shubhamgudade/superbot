@@ -1,21 +1,32 @@
-const MANIFEST_URL = "https://www.stardewvalleywiki.net/api/v1/manifest.json";
+import { crops, fish, villagers, universalGifts } from "stardew-valley-data";
 
 export default {
   name: "stardew",
   aliases: ["sdv"],
   async execute({ sock, message, args }) {
     try {
-      const manifestResponse = await fetch(MANIFEST_URL);
-      if (!manifestResponse.ok) {
-        throw new Error(`Manifest HTTP ${manifestResponse.status}`);
-      }
-
-      const manifest = await manifestResponse.json();
       const kind = (args[0] || "fish").toLowerCase();
 
-      const source = manifest[kind] || manifest.datasets?.[kind] || manifest.data?.[kind];
+      let item;
 
-      if (!source) {
+      if (kind === "fish") {
+        const items = fish().get();
+        item = items[Math.floor(Math.random() * items.length)];
+      } else if (kind === "crops") {
+        const items = crops().get();
+        item = items[Math.floor(Math.random() * items.length)];
+      } else if (kind === "villagers") {
+        const items = villagers().get();
+        item = items[Math.floor(Math.random() * items.length)];
+      } else if (kind === "gifts") {
+        const data = universalGifts();
+        const keys = ["loved", "liked", "neutral", "disliked", "hated"];
+        const available = keys.filter((key) => Array.isArray(data[key]) && data[key].length);
+        const key = available[Math.floor(Math.random() * available.length)];
+        const items = data[key];
+        const gift = items[Math.floor(Math.random() * items.length)];
+        item = { name: gift, category: key };
+      } else {
         return sock.sendMessage(
           message.key.remoteJid,
           { text: "❌ Use +stardew fish, +stardew crops, +stardew villagers, or +stardew gifts." },
@@ -23,30 +34,22 @@ export default {
         );
       }
 
-      const url = typeof source === "string" ? source : source.url;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Dataset HTTP ${response.status}`);
-      }
+      if (!item) throw new Error("No Stardew data returned");
 
-      const data = await response.json();
-      const items = Array.isArray(data) ? data : data.data || data.items || [];
-
-      if (!items.length) {
-        throw new Error("Dataset is empty");
-      }
-
-      const item = items[Math.floor(Math.random() * items.length)];
-      const name = item.name || item.Name || item.displayName || "Unknown";
       const details = Object.entries(item)
-        .filter(([key]) => !["name", "Name", "displayName"].includes(key))
-        .slice(0, 5)
-        .map(([key, value]) => `• ${key}: ${Array.isArray(value) ? value.join(", ") : value}`)
+        .filter(([key, value]) => key !== "name" && value !== undefined && value !== null)
+        .slice(0, 6)
+        .map(([key, value]) => {
+          const formatted = Array.isArray(value) ? value.join(", ") : String(value);
+          return `• ${key}: ${formatted}`;
+        })
         .join("\n");
 
       await sock.sendMessage(
         message.key.remoteJid,
-        { text: `🌾 *Stardew Valley — ${name}*\n\n${details}` },
+        {
+          text: `🌾 *Stardew Valley — ${item.name || "Random Entry"}*\n\n${details || "No extra details available."}`,
+        },
         { quoted: message }
       );
     } catch (error) {
