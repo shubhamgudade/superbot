@@ -45,13 +45,34 @@ function getQuotedMessage(message) {
 function getImageMessage(message) {
   const content = unwrapMessage(message?.message);
   if (!content) return null;
+  return content.imageMessage || null;
+}
 
-  if (content.imageMessage) return content.imageMessage;
-  if (content.viewOnceMessage?.message?.imageMessage) {
-    return content.viewOnceMessage.message.imageMessage;
-  }
+function getContextInfo(message) {
+  const content = unwrapMessage(message?.message);
+  return (
+    content?.extendedTextMessage?.contextInfo ||
+    content?.imageMessage?.contextInfo ||
+    content?.videoMessage?.contextInfo ||
+    content?.documentMessage?.contextInfo ||
+    null
+  );
+}
 
-  return null;
+function getQuotedWAMessage(message) {
+  const context = getContextInfo(message);
+  const quoted = unwrapMessage(context?.quotedMessage);
+  if (!quoted) return null;
+
+  return {
+    key: {
+      remoteJid: message.key.remoteJid,
+      fromMe: Boolean(context?.participant === message.key.participant),
+      id: context?.stanzaId,
+      participant: context?.participant,
+    },
+    message: quoted,
+  };
 }
 
 async function getImageBuffer(message) {
@@ -59,7 +80,7 @@ async function getImageBuffer(message) {
   if (!imageMessage) return null;
 
   return downloadMediaMessage(
-    { message: unwrapMessage(message.message) },
+    message,
     "buffer",
     {},
     {
@@ -119,21 +140,8 @@ async function uploadImage(buffer) {
 }
 
 async function getSourceImage(message) {
-  const direct = getImageMessage(message);
-  if (direct) return message;
-
-  const context =
-    message?.message?.extendedTextMessage?.contextInfo ||
-    message?.message?.imageMessage?.contextInfo ||
-    message?.message?.videoMessage?.contextInfo ||
-    message?.message?.documentMessage?.contextInfo;
-
-  const quoted = context?.quotedMessage;
-  if (quoted && getImageMessage({ message: quoted })) {
-    return { message: quoted };
-  }
-
-  return null;
+  if (getImageMessage(message)) return message;
+  return getQuotedWAMessage(message);
 }
 
 async function requestImage(command, imageUrl) {
