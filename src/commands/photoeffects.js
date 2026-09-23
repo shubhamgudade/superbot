@@ -1,5 +1,6 @@
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import pino from "pino";
+import ffmpeg from "fluent-ffmpeg";
 
 const API = "https://api.some-random-api.com/canvas/overlay/jail";
 const APHRO_WANTED = "https://aphro.vercel.app/generate/wanted";
@@ -65,20 +66,43 @@ async function getImageBuffer(message) {
   );
 }
 
-async function uploadToCatbox(buffer) {
-  const form = new FormData();
-  form.append("reqtype", "fileupload");
-  form.append("time", "1h");
-  form.append("fileToUpload", new Blob([buffer], { type: "image/jpeg" }), "image.jpg");
+async function toPng(buffer) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const command = ffmpeg()
+      .input("pipe:0")
+      .inputFormat("image2pipe")
+      .outputFormat("png")
+      .on("error", reject)
+      .on("end", () => resolve(Buffer.concat(chunks)));
 
-  const response = await fetch("https://litterbox.catbox.moe/resources/internals/api.php", {
+    const output = command.pipe();
+    output.on("data", (chunk) => chunks.push(chunk));
+    output.on("error", reject);
+    output.on("end", () => {});
+    output.on("close", () => {});
+    output.on("finish", () => {});
+    output.on("drain", () => {});
+
+    command.on("start", () => {});
+    command.on("end", () => {});
+    command._process?.stdin?.end(buffer);
+  });
+}
+
+async function uploadImage(buffer) {
+  const png = await toPng(buffer);
+  const form = new FormData();
+  form.append("file", new Blob([png], { type: "image/png" }), "avatar.png");
+
+  const response = await fetch("https://0x0.st", {
     method: "POST",
     body: form,
   });
 
   const url = (await response.text()).trim();
   if (!response.ok || !url.startsWith("http")) {
-    throw new Error(`Catbox upload failed: ${url.slice(0, 200)}`);
+    throw new Error(`Image upload failed: ${url.slice(0, 200)}`);
   }
 
   return url;
@@ -135,7 +159,7 @@ async function run({ sock, message, command }) {
     const buffer = await getImageBuffer(source);
     if (!buffer) throw new Error("Could not download image");
 
-    const imageUrl = await uploadToCatbox(buffer);
+    const imageUrl = await uploadImage(buffer);
     const output = await requestImage(command, imageUrl);
 
     await sock.sendMessage(message.key.remoteJid, {
