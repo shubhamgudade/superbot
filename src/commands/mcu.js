@@ -1,7 +1,7 @@
 export default {
   name: "mcu",
   aliases: ["marvel"],
-  async execute(sock, message) {
+  async execute({ sock, message }) {
     try {
       const response = await fetch("https://www.whenisthenextmcufilm.com/api");
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
