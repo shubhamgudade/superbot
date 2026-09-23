@@ -1,7 +1,7 @@
 export default {
   name: "akshay",
   aliases: ["akshaykumar"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const code = args[0] || "200";
     try {
       const r = await fetch(`https://akshaykumar-rest.vercel.app/api/${encodeURIComponent(code)}`);
