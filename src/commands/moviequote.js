@@ -3,14 +3,11 @@ export default {
   aliases: ["mquote"],
   async execute({ sock, message, args }) {
     try {
-      const response = await fetch(
-        "https://movie-quotes-api.vercel.app/api/v1/quotes",
-        {
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
+      const requestedMovie = args.join(" ").trim();
+      const url = new URL("https://movie-quotes-api.vercel.app/api/v1/quotes");
+      const response = await fetch(url, {
+        headers: { Accept: "application/json" },
+      });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -21,26 +18,26 @@ export default {
         ? data
         : Array.isArray(data.quotes)
           ? data.quotes
-          : [];
+          : data.quote
+            ? [data]
+            : [];
 
       if (!quotes.length) {
         throw new Error("No quotes returned");
       }
 
-      const requestedMovie = args.join(" ").trim().toLowerCase();
-
       const matches = requestedMovie
         ? quotes.filter((item) =>
-            String(item.movie || item.title || item.name || "")
+            String(item.movie || item.title || "")
               .toLowerCase()
-              .includes(requestedMovie)
+              .includes(requestedMovie.toLowerCase())
           )
         : quotes;
 
       if (!matches.length) {
         return sock.sendMessage(
           message.key.remoteJid,
-          { text: `❌ No movie quote found for: ${args.join(" ")}` },
+          { text: `❌ No movie quote found for: ${requestedMovie}` },
           { quoted: message }
         );
       }
@@ -50,7 +47,7 @@ export default {
       await sock.sendMessage(
         message.key.remoteJid,
         {
-          text: `🎬 *Movie Quote*\n\n“${quote.quote || quote.text || "No quote"}”\n\n— ${quote.movie || quote.title || quote.name || "Unknown"}`,
+          text: `🎬 *Movie Quote*\n\n“${quote.quote || quote.text || "No quote"}”\n\n— ${quote.movie || quote.title || "Unknown"}`,
         },
         { quoted: message }
       );
