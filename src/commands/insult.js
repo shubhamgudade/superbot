@@ -1,7 +1,7 @@
 export default {
   name: "insult",
   aliases: ["roast"],
-  async execute(sock, message) {
+  async execute({ sock, message }) {
     try {
       const r=await fetch("https://evilinsult.com/generate_insult.php?lang=en&type=json");
       const d=await r.json();
