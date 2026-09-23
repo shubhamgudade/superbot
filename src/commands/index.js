@@ -23,11 +23,12 @@ import akshay from "./akshay.js";
 import translate from "./translate.js";
 import musicapi from "./musicapi.js";
 import gaanaapi from "./gaanaapi.js";
+import movie from "./movie.js";
 import { wanted, criminal, jail } from "./photoeffects.js";
 
 const commands = new Map();
 
-for (const command of [hi, setprefix, sticker, opno, kirk, carbon, pokemon, avatar, chuck, joke, fact, digimon, tcg, stardew, mcu, lyrics, wiki, insult, indianquote, moviequote, covid, akshay, translate, musicapi, gaanaapi, wanted, criminal, jail]) {
+for (const command of [hi, setprefix, sticker, opno, kirk, carbon, pokemon, avatar, chuck, joke, fact, digimon, tcg, stardew, mcu, lyrics, wiki, insult, indianquote, moviequote, covid, akshay, translate, musicapi, gaanaapi, movie, wanted, criminal, jail]) {
   commands.set(command.name, command);
 
   for (const alias of command.aliases || []) {
