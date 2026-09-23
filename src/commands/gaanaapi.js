@@ -1,7 +1,7 @@
 export default {
   name: "gaanaapi",
   aliases: ["gaana"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const base=process.env.GAANA_API_URL;
     if(!base) return sock.sendMessage(message.key.remoteJid,{text:"❌ Gaana API is a self-hosted project. Set GAANA_API_URL in .env first."},{quoted:message});
     if(!args.length) return sock.sendMessage(message.key.remoteJid,{text:"❌ Usage: +gaana <Gaana song URL>"},{quoted:message});
