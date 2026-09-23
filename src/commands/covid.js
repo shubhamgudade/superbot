@@ -1,7 +1,7 @@
 export default {
   name: "covid",
   aliases: ["covid19"],
-  async execute(sock, message) {
+  async execute({ sock, message }) {
     try {
       const r=await fetch("https://data.covid19india.org/v4/min/data.min.json");
       if(!r.ok) throw new Error(`HTTP ${r.status}`);
