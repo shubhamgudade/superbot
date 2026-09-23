@@ -1,7 +1,7 @@
 export default {
   name: "moviequote",
   aliases: ["mquote"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     try {
       const base="https://movie-quote-api.herokuapp.com/v1";
       const url=args.length ? `${base}/shows/${encodeURIComponent(args.join("-").toLowerCase())}` : `${base}/quote/`;
