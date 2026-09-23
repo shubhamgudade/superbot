@@ -1,7 +1,7 @@
 export default {
   name: "lyrics",
   aliases: ["lyric"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     if (!args.length) return sock.sendMessage(message.key.remoteJid,{text:"❌ Usage: +lyrics Song Name - Artist"}, {quoted:message});
     const parts=args.join(" - ").split(" - ");
     const track_name=parts[0].trim();
