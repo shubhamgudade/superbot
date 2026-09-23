@@ -7,13 +7,15 @@ import pino from "pino";
 
 import { getPrefix } from "./config/prefix.js";
 import { getCommand } from "./commands/index.js";
-import { handleImageTrigger } from "./triggers/imageTriggers.js";
+import { fireRandomGif } from "./commands/random.js";
 
 const phoneNumber = (process.env.PHONE_NUMBER || "").replace(/\D/g, "");
 
 if (!phoneNumber) {
   throw new Error("PHONE_NUMBER is required in .env");
 }
+
+const groupMessageCount = {};
 
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState("sessions");
@@ -30,13 +32,10 @@ async function startBot() {
   sock.ev.on("connection.update", async ({ connection, qr, lastDisconnect }) => {
     if (qr && !state.creds.registered && !pairingCodeRequested) {
       pairingCodeRequested = true;
-
       try {
         const code = await sock.requestPairingCode(phoneNumber);
         console.log("\nPairing code:", code);
-        console.log(
-          "On WhatsApp: Linked devices -> Link a device -> Link with phone number.\n",
-        );
+        console.log("On WhatsApp: Linked devices -> Link a device -> Link with phone number.\n");
       } catch (error) {
         pairingCodeRequested = false;
         console.error("Failed to generate pairing code:", error);
@@ -50,7 +49,6 @@ async function startBot() {
 
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-
       if (statusCode !== DisconnectReason.loggedOut) {
         console.log("Connection closed. Reconnecting...");
         startBot().catch(console.error);
@@ -66,6 +64,16 @@ async function startBot() {
     for (const message of messages) {
       if (message.key.fromMe || !message.message) continue;
 
+      // fire random gif every 4 group messages as a reply to the 4th message
+      const isGroup = message.key.remoteJid?.endsWith("@g.us");
+      if (isGroup) {
+        const jid = message.key.remoteJid;
+        groupMessageCount[jid] = (groupMessageCount[jid] || 0) + 1;
+        if (groupMessageCount[jid] % 4 === 0) {
+          await fireRandomGif(sock, jid, message);
+        }
+      }
+
       const content = message.message;
       const text =
         content.conversation ||
@@ -78,10 +86,7 @@ async function startBot() {
       const prefix = await getPrefix();
       const input = text.trim();
 
-      if (!input.startsWith(prefix)) {
-        await handleImageTrigger({ sock, message, text });
-        continue;
-      }
+      if (!input.startsWith(prefix)) continue;
 
       const body = input.slice(prefix.length).trim();
       if (!body) continue;
@@ -101,7 +106,6 @@ async function startBot() {
         });
       } catch (error) {
         console.error(`Command failed: ${command.name}`, error);
-
         await sock.sendMessage(message.key.remoteJid, {
           text: "Something went wrong while running that command.",
         });
