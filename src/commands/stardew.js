@@ -3,7 +3,7 @@ const MANIFEST_URL = "https://www.stardewvalleywiki.net/api/v1/manifest.json";
 export default {
   name: "stardew",
   aliases: ["sdv"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     try {
       const manifestResponse = await fetch(MANIFEST_URL);
       if (!manifestResponse.ok) {
