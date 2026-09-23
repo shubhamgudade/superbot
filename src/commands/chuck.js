@@ -1,7 +1,7 @@
 export default {
   name: "chuck",
   aliases: [],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const category = args[0]?.toLowerCase();
 
     try {
