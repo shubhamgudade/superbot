@@ -1,6 +1,9 @@
 import { downloadMediaMessage } from "@whiskeysockets/baileys";
 import pino from "pino";
 import ffmpeg from "fluent-ffmpeg";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 
 const API = "https://api.some-random-api.com/canvas/overlay/jail";
 const APHRO_WANTED = "https://aphro.vercel.app/generate/wanted";
@@ -67,27 +70,26 @@ async function getImageBuffer(message) {
 }
 
 async function toPng(buffer) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    const command = ffmpeg()
-      .input("pipe:0")
-      .inputFormat("image2pipe")
-      .outputFormat("png")
-      .on("error", reject)
-      .on("end", () => resolve(Buffer.concat(chunks)));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "superbot-photo-"));
+  const input = path.join(dir, "input.jpg");
+  const output = path.join(dir, "avatar.png");
 
-    const output = command.pipe();
-    output.on("data", (chunk) => chunks.push(chunk));
-    output.on("error", reject);
-    output.on("end", () => {});
-    output.on("close", () => {});
-    output.on("finish", () => {});
-    output.on("drain", () => {});
+  try {
+    await fs.writeFile(input, buffer);
 
-    command.on("start", () => {});
-    command.on("end", () => {});
-    command._process?.stdin?.end(buffer);
-  });
+    await new Promise((resolve, reject) => {
+      ffmpeg(input)
+        .outputOptions(["-frames:v 1"])
+        .output(output)
+        .on("end", resolve)
+        .on("error", reject)
+        .run();
+    });
+
+    return await fs.readFile(output);
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true });
+  }
 }
 
 async function uploadImage(buffer) {
