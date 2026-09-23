@@ -1,7 +1,7 @@
 export default {
   name: "fact",
   aliases: ["useless"],
-  async execute(sock, message) {
+  async execute({ sock, message }) {
     try {
       const response = await fetch(
         "https://uselessfacts.jsph.pl/api/v2/facts/random?language=en",
