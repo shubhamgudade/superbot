@@ -1,7 +1,7 @@
 export default {
   name: "gender",
   aliases: ["genderize"],
-  async execute(sock, message, args) {
+  async execute({ sock, message, args }) {
     const name = args.join(" ").trim();
 
     if (!name) {
